@@ -1,0 +1,211 @@
+<!-- public/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Multiplayer Game</title>
+    <style>
+      #game-container {
+        position: relative;
+        width: 200px;
+        height: 200px;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .chat-message {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 16px;
+  background-color: rgba(0, 0, 0, 0.57);
+  color: azure;
+  padding: 5px 10px;
+  border-radius: 5px;
+  white-space: nowrap; /* Ensures the text doesn't wrap */
+  display: inline-block; /* Displays messages inline */
+  margin-right: 10px; /* Adds space between messages */
+}
+
+      .user {
+        position: absolute;
+        width: 50px;
+        height: 50px;
+        background-color: red;
+      }
+
+      .username {
+        position: absolute;
+        top: -20px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 12px;
+      }
+
+      .inputfield {
+        bottom: 25px;
+        left: 40%;
+        position: absolute;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container"></div>
+
+    <div class="inputfield">
+      <input type="text" id="messageInput" placeholder="Type a message..." />
+      <button id="sendMessageBtn">Send</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        function askForUsername() {
+          localStorage.clear();
+        let username = localStorage.getItem("username");
+        if (!username || username.trim() === "") {
+          username = prompt("Enter your username:");
+          localStorage.setItem("username", username);
+        }
+        return username;
+      }
+
+      function initializeGame() {
+        const socket = io();
+        let username = askForUsername();
+
+        if (!username || username.trim() === "") {
+          localStorage.removeItem("username");
+          window.location.reload(); // Reload the page if username is null or empty
+        } else {
+          socket.emit("join", { username });
+
+      // Emit join event with the obtained or prompted username
+   
+
+      let mySquare = document.createElement("div");
+      mySquare.className = "user";
+      mySquare.innerHTML = `<div class="username">${username}</div>`;
+      document.getElementById("game-container").appendChild(mySquare);
+
+      let keysPressed = {};
+
+      document.addEventListener("keydown", (event) => {
+        keysPressed[event.key] = true;
+      });
+
+      document.addEventListener("keyup", (event) => {
+        keysPressed[event.key] = false;
+      });
+
+      function movePlayer() {
+        const stepSize = 5;
+        const position = { x: mySquare.offsetLeft, y: mySquare.offsetTop };
+
+        if (keysPressed["ArrowUp"]) {
+          position.y -= stepSize;
+        }
+        if (keysPressed["ArrowDown"]) {
+          position.y += stepSize;
+        }
+        if (keysPressed["ArrowLeft"]) {
+          position.x -= stepSize;
+        }
+        if (keysPressed["ArrowRight"]) {
+          position.x += stepSize;
+        }
+
+        mySquare.style.left = `${position.x}px`;
+        mySquare.style.top = `${position.y}px`;
+
+        // Emit movement only if there's a change in position
+        socket.emit("move", position);
+
+        requestAnimationFrame(movePlayer);
+      }
+
+      movePlayer();
+
+      socket.on("newUser", (data) => {
+        const { id, userData } = data;
+        const newUser = document.createElement("div");
+        newUser.className = "user";
+        newUser.id = id;
+        newUser.innerHTML = `<div class="username">${userData.username}</div>`;
+        document.getElementById("game-container").appendChild(newUser);
+      });
+
+      socket.on("existingUsers", (existingUsers) => {
+  Object.keys(existingUsers).forEach((userId) => {
+    const userData = existingUsers[userId];
+    if (userData.username !== username) { // Check if the user is not the current user
+      const newUser = document.createElement("div");
+      newUser.className = "user";
+      newUser.id = userId;
+      newUser.innerHTML = `<div class="username">${userData.username}</div>`;
+      document.getElementById("game-container").appendChild(newUser);
+    }
+  });
+});
+
+
+      socket.on("userDisconnect", (data) => {
+        const { id } = data;
+        const disconnectedUser = document.getElementById(id);
+        if (disconnectedUser) {
+          disconnectedUser.remove();
+        }
+      });
+
+      socket.on("playerMove", (data) => {
+        const { id, position } = data;
+        const playerSquare = document.getElementById(id);
+
+        if (playerSquare && position) {
+          playerSquare.style.left = `${position.x}px`;
+          playerSquare.style.top = `${position.y}px`;
+        }
+      });
+
+      function sendMessage() {
+    const message = document.getElementById("messageInput").value;
+    if (message.trim() !== "") {
+      socket.emit("chatMessage", message);
+      document.getElementById("messageInput").value = "";
+    }
+  }
+
+      socket.on("chatMessage", (data) => {
+        const { id, message } = data;
+
+        const userSquare = document.getElementById(id);
+        if (userSquare) {
+          const messageElement = document.createElement("div");
+          messageElement.className = "chat-message";
+          messageElement.textContent = message;
+
+          userSquare.appendChild(messageElement);
+
+          setTimeout(() => {
+            messageElement.remove();
+          }, 5000);
+        }
+      });
+
+      window.onload = function () {
+    document.getElementById("sendMessageBtn").onclick = function () {
+      sendMessage();
+    };
+  };
+        }
+      }
+
+      initializeGame();
+    </script>
+  </body>
+</html>
