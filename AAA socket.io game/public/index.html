@@ -53,10 +53,56 @@
         left: 40%;
         position: absolute;
       }
+
+      .chat-container {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  height: 200px;
+}
+
+.message-content {
+  /* Define the message appearance here */
+  background-color: rgba(0, 0, 0, 0.57);
+  color: azure;
+  padding: 5px 10px;
+  border-radius: 5px;
+  /* Allow text wrapping */
+  word-wrap: break-word;
+  /* Set a maximum width for the message */
+  max-width: 90%; /* Adjust this value as needed */
+  /* Margin-bottom and any other styles you want to retain */
+  margin-bottom: 5px;
+}
+
+/* Adjust the container styles */
+.chat-box {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+#chat-messages {
+  max-height: 100%;
+}
+
+.chat-message {
+  font-size: 14px;
+  margin-bottom: 5px;
+}
     </style>
   </head>
   <body>
     <div id="game-container"></div>
+
+    <div class="chat-container">
+      <div class="chat-box">
+        <div id="chat-messages"></div>
+      </div>
+    </div>
 
     <div class="inputfield">
       <input
@@ -145,20 +191,29 @@
           movePlayer();
 
           socket.on("newUser", (data) => {
-            const { id, userData } = data;
-            if (userData.username !== username) {
-              createUserElement(id, userData.username);
-            }
-          });
+    const { id, username } = data;
+    if (username !== localStorage.getItem("username")) {
+      createUserElement(id, username);
+    }
+  });
 
           socket.on("existingUsers", (existingUsers) => {
             Object.keys(existingUsers).forEach((userId) => {
               const userData = existingUsers[userId];
               if (userData.username !== username) {
                 createUserElement(userId, userData.username);
+                users = existingUsers;
               }
             });
           });
+
+      
+
+    socket.on('updateUsers', (updatedUsers) => {
+      users = updatedUsers; 
+      
+      
+    });
 
           function createUserElement(userId, username) {
             const newUser = document.createElement("div");
@@ -187,11 +242,25 @@
           });
 
           function sendMessage() {
-    const message = document.getElementById("messageInput").value;
-    if (message.trim() !== "") {
-        socket.emit("chatMessage", message);
-        document.getElementById("messageInput").value = "";
-    }
+  const message = document.getElementById("messageInput").value;
+  if (message.trim() !== "") {
+    socket.emit("chatMessage", message);
+    displayOwnMessage(message); // Display the user's own message
+    document.getElementById("messageInput").value = "";
+  }
+}
+
+function displayOwnMessage(message) {
+  const mySquare = document.querySelector(".user");
+  const messageElement = document.createElement("div");
+  messageElement.className = "chat-message";
+  messageElement.textContent = message;
+
+  mySquare.appendChild(messageElement);
+
+  setTimeout(() => {
+    messageElement.remove();
+  }, 5000);
 }
 
           socket.on("chatMessage", (data) => {
@@ -210,6 +279,25 @@
               }, 5000);
             }
           });
+
+          function displayChatMessage(message, sender) {
+  const chatMessages = document.getElementById("chat-messages");
+  const messageElement = document.createElement("div");
+  messageElement.className = "message-content";
+  messageElement.textContent = `${sender}: ${message}`;
+
+  chatMessages.appendChild(messageElement);
+
+  // Scroll the last message into view
+  messageElement.scrollIntoView();
+}
+
+  socket.on("chatMessage", (data) => {
+    const { id, message } = data;
+    const sender = id === socket.id ? "You" : users[id]?.username || "Anonymous";
+
+    displayChatMessage(message, sender);
+  });
 
           window.onload = function () {
     document.getElementById("messageInput").addEventListener("keypress", function (event) {
