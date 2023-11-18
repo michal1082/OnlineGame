@@ -14,9 +14,10 @@ io.on('connection', (socket) => {
   console.log('A user connected');
 
   socket.on('join', (userData) => {
-    users[socket.id] = userData;
+    users[socket.id] = userData; // Store user with username
     io.to(socket.id).emit('existingUsers', users);
-    io.emit('newUser', { id: socket.id, userData });
+    io.emit('newUser', { id: socket.id, username: userData.username });
+    io.emit('updateUsers', users); // Emit updated users to all clients including the new user
   });
 
   socket.on('chatMessage', (message) => {
